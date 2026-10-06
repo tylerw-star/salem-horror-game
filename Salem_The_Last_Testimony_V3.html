@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Salem: The Last Testimony — V3</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#020304;color:#eee;font-family:Georgia,serif}
+#game{position:fixed;inset:0}#hud{position:fixed;inset:0;pointer-events:none}
+#hudTop{position:absolute;left:20px;top:17px;text-shadow:0 2px 10px #000}
+#title{font-size:21px;letter-spacing:3px}#timer{font:bold 28px Arial;margin-top:5px}
+#objective,#count,#status{font:14px Arial;margin-top:4px;max-width:480px}
+#cross{position:absolute;left:50%;top:50%;width:5px;height:5px;margin:-2px;border-radius:50%;background:#eee;box-shadow:0 0 6px #fff}
+#prompt{position:absolute;bottom:32px;left:50%;transform:translateX(-50%);padding:11px 17px;background:#000c;border:1px solid #777;border-radius:5px;font:15px Arial;opacity:0;transition:.15s}
+#message{position:absolute;left:50%;top:43%;transform:translate(-50%,-50%);font:bold 25px Arial;text-align:center;text-shadow:0 2px 14px #000;opacity:0;transition:.2s;max-width:800px}
+#lanternIcon{position:absolute;right:20px;bottom:17px;width:64px;height:82px}
+#lanternIcon:before{content:"";position:absolute;left:17px;top:17px;width:30px;height:51px;border:2px solid #777;border-radius:6px}
+#lanternIcon:after{content:"";position:absolute;left:26px;top:25px;width:12px;height:34px;border-radius:50%;background:#f7d58a;box-shadow:0 0 25px 12px #e9a53d55}
+#stamina{position:absolute;right:23px;bottom:112px;width:125px;height:6px;background:#222;border:1px solid #555}
+#staminaFill{height:100%;width:100%;background:#ddd}
+#fear{position:absolute;right:23px;bottom:92px;font:11px Arial;color:#aaa}
+.overlay{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000e;z-index:20}
+.panel{width:min(760px,calc(100% - 40px));max-height:82vh;overflow:auto;padding:30px 34px;background:#0d0d0ef7;border:1px solid #666;box-shadow:0 0 80px #000}
+h1{font-size:40px;letter-spacing:4px;margin:0 0 9px}h2{font-size:27px;margin:0 0 15px}
+p{line-height:1.6}.small{font:13px Arial;color:#aaa}
+button{padding:12px 23px;background:#222;color:#fff;border:1px solid #aaa;border-radius:4px;font:bold 15px Arial;cursor:pointer}
+button:hover{background:#444}
+#journalOverlay,#endOverlay,#scareOverlay,#pauseOverlay,#revealOverlay{display:none}
+.journalText{text-align:left;border-top:1px solid #555;border-bottom:1px solid #555;padding:18px 8px;margin:18px 0;line-height:1.65}
+#scareOverlay{background:#000f}#scareFace{font:140px Arial;color:#eee;text-shadow:0 0 35px #fff;animation:shake .055s infinite alternate}
+@keyframes shake{from{transform:translate(-4px,0) scale(.96)}to{transform:translate(4px,0) scale(1.04)}}
+.reveal{text-align:left;line-height:1.7;border-top:1px solid #555;border-bottom:1px solid #555;padding:18px 4px;margin:15px 0}
+</style>
+</head>
+<body>
+<div id="game"></div>
+<div id="hud">
+ <div id="hudTop">
+  <div id="title">SALEM: THE LAST TESTIMONY</div>
+  <div id="timer">07:00</div>
+  <div id="objective">Enter Salem and find the first testimony.</div>
+  <div id="count">TESTIMONIES: 0 / 5</div>
+  <div id="status">SAFE</div>
+ </div>
+ <div id="cross"></div><div id="prompt"></div><div id="message"></div>
+ <div id="lanternIcon"></div>
+ <div id="stamina"><div id="staminaFill"></div></div><div id="fear">FEAR</div>
+</div>
+
+<div id="startOverlay" class="overlay">
+ <div class="panel">
+  <h1>SALEM</h1><h2>THE LAST TESTIMONY</h2>
+  <p><b>Salem Village — 1692.</b></p>
+  <p>The accusations have begun. Five testimonies remain scattered through the village. Recover them before the night ends.</p>
+  <p>Doors are locked. Keys are hidden. Some rooms may be safer than the streets.</p>
+  <p class="small"><b>WASD</b> move · <b>MOUSE</b> look · <b>SHIFT</b> sprint · <b>E</b> interact · <b>F</b> lantern · <b>H</b> hide/unhide</p>
+  <button id="startBtn">ENTER SALEM</button>
+ </div>
+</div>
+
+<div id="journalOverlay" class="overlay">
+ <div class="panel"><h2 id="journalTitle"></h2><div id="journalText" class="journalText"></div><button id="closeJournal">CLOSE</button></div>
+</div>
+
+<div id="pauseOverlay" class="overlay">
+ <div class="panel"><h2>PAUSED</h2><p>The village waits in silence.</p><button id="resume">RETURN</button></div>
+</div>
+
+<div id="scareOverlay" class="overlay"><div id="scareFace">☠</div></div>
+
+<div id="revealOverlay" class="overlay">
+ <div class="panel">
+  <h1>THE REVEAL</h1>
+  <div class="reveal">
+   <p>The witch you saw was never a historical explanation for Salem.</p>
+   <p>The real horror was a community in which <b>fear, authority, reputation, religious belief, rumor, and the pressure to conform</b> could turn accusations into accepted truth.</p>
+   <p>In 1692, accusations of witchcraft spread through Salem and surrounding communities. Courts accepted forms of testimony that were later challenged, and dozens of people were accused, imprisoned, or executed before the prosecutions collapsed.</p>
+   <p>The final question is not simply, “Who was the witch?”</p>
+   <p><b>It is: How did Salem decide what counted as truth?</b></p>
+  </div>
+  <p class="small">Replace this final reveal later with your group's AP Lang thesis, evidence, and required lenses.</p>
+  <button id="continueReveal">CONTINUE</button>
+ </div>
+</div>
+
+<div id="endOverlay" class="overlay">
+ <div class="panel"><h1 id="endTitle"></h1><p id="endText"></p><button id="restart">PLAY AGAIN</button></div>
+</div>
+
+<script type="module">
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js";
+import {PointerLockControls} from "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/controls/PointerLockControls.js";
+
+const $=id=>document.getElementById(id);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x020304);
+scene.fog=new THREE.FogExp2(0x050608,.027);
+const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,.05,150);
+camera.position.set(0,1.65,25);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+$("game").appendChild(renderer.domElement);
+const controls=new PointerLockControls(camera,renderer.domElement);
+
+const ambient=new THREE.HemisphereLight(0x44505a,0x030303,.25);scene.add(ambient);
+const moon=new THREE.DirectionalLight(0x74899f,.25);moon.position.set(-30,40,10);moon.castShadow=true;moon.shadow.mapSize.set(1024,1024);scene.add(moon);
+const lantern=new THREE.PointLight(0xffb85c,2.8,14,1.7);lantern.castShadow=true;camera.add(lantern);scene.add(camera);
+
+const M={
+ ground:new THREE.MeshStandardMaterial({color:0x111516,roughness:1}),
+ road:new THREE.MeshStandardMaterial({color:0x272522,roughness:1}),
+ wood:new THREE.MeshStandardMaterial({color:0x2c241e,roughness:1}),
+ wall:new THREE.MeshStandardMaterial({color:0x383634,roughness:1}),
+ wall2:new THREE.MeshStandardMaterial({color:0x2d3130,roughness:1}),
+ roof:new THREE.MeshStandardMaterial({color:0x111314,roughness:1}),
+ paper:new THREE.MeshStandardMaterial({color:0xb99e70,roughness:1}),
+ black:new THREE.MeshStandardMaterial({color:0x070808,roughness:1}),
+ metal:new THREE.MeshStandardMaterial({color:0x55585a,roughness:.8}),
+ red:new THREE.MeshStandardMaterial({color:0x4a1515,roughness:1}),
+ stone:new THREE.MeshStandardMaterial({color:0x484848,roughness:1})
+};
+function box(x,y,z,w,h,d,m,ry=0){
+ const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.rotation.y=ry;o.castShadow=true;o.receiveShadow=true;scene.add(o);return o;
+}
+function cyl(x,y,z,r,h,m){
+ const o=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,9),m);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;scene.add(o);return o;
+}
+function tree(x,z,s=1){
+ cyl(x,1.5*s,z,.24*s,3*s,M.wood);
+ const c=new THREE.Mesh(new THREE.SphereGeometry(1.55*s,8,6),new THREE.MeshStandardMaterial({color:0x0d1513,roughness:1}));
+ c.position.set(x,3.55*s,z);c.castShadow=true;scene.add(c);
+}
+function lamp(x,z){
+ const post=cyl(x,1.7,z,.08,3.4,M.wood);
+ const l=new THREE.PointLight(0xffad58,.55,7,2);l.position.set(x,3.2,z);scene.add(l);
+}
+function windowLight(x,y,z,ry=0){
+ box(x,y,z,.75,.95,.08,M.black,ry);
+ const p=new THREE.Mesh(new THREE.PlaneGeometry(.58,.7),new THREE.MeshBasicMaterial({color:0x8b7044}));
+ p.position.set(x,y,z-(Math.cos(ry)*.055));p.rotation.y=ry;scene.add(p);
+}
+function house(x,z,w=5,d=5,doorFront=true){
+ box(x,1.7,z,w,3.4,d,M.wall);box(x,3.65,z,w+.5,.7,d+.5,M.roof);
+ if(doorFront){box(x,1.45,z-d/2-.08,1,2.3,M.wood);windowLight(x-w*.3,1.9,z-d/2-.11);windowLight(x+w*.3,1.9,z-d/2-.11);}
+}
+
+/* town */
+box(0,-.25,0,70,.5,70,M.ground);
+box(0,-.02,0,4,.08,58,M.road);box(0,-.01,0,58,.08,4,M.road);
+box(-10,-.01,0,2,.08,58,M.road);box(10,-.01,0,2,.08,58,M.road);
+
+[[-16,-15],[-7,-16],[3,-16],[15,-15],[-16,-5],[16,-5],[-16,6],[16,6],[-15,16],[-6,16],[5,16],[15,15]].forEach(p=>house(...p));
+[[-16,-15],[-7,-16],[3,-16],[15,-15],[-16,-5],[16,-5],[-16,6],[16,6],[-15,16],[-6,16],[5,16],[15,15]].forEach(p=>lamp(...p));
+
+/* meeting house */
+box(0,2.5,-5,8,5,7,M.wall2);box(0,5.25,-5,8.7,1,7.6,M.roof);
+cyl(0,7.5,-5,.55,4,M.wood);box(0,9.55,-5,.15,1.1,.15,M.wood);
+box(0,1.6,-8.58,1.2,2.7,M.wood);windowLight(-2.4,2.5,-8.58);windowLight(2.4,2.5,-8.58);
+
+/* gallows */
+box(-25,.15,-5,8,.3,7,M.wood);cyl(-27,3,-5,.18,6,M.wood);cyl(-21,3,-5,.18,6,M.wood);box(-24,5.8,-5,6,.3,.3,M.wood);
+cyl(-24,4.8,-5,.07,1.8,M.wood);
+
+/* graveyard */
+for(let x=-28;x<=-21;x+=2)for(let z=9;z<=16;z+=2.2)box(x,.5,z,.75,1,.18,M.stone,(Math.random()-.5)*.25);
+
+/* woods */
+[[-27,22],[-21,23],[-13,23],[13,23],[22,22],[27,15],[27,-18],[20,-23],[-20,-23],[-28,-16]].forEach(p=>tree(...p,1.2));
+
+/* interiors: visible rooms behind doors */
+function room(x,z,w=5,d=5){
+ const floor=box(x,.03,z,w-.25,.06,d-.25,M.wood);
+ /* back wall/side walls leave front door */
+ box(x,2,z+d/2,w,4,.18,M.wall2);
+ box(x-w/2,2,z,.18,4,d,M.wall2);box(x+w/2,2,z,.18,4,d,M.wall2);
+ box(x,3.9,z,w+.2,.25,d,M.roof);
+ return floor;
+}
+room(-16,-15);room(16,6);room(-6,16);
+
+/* furniture / historical atmosphere */
+function table(x,z){
+ box(x,.65,z,2.3,.12,1,M.wood);for(const dx of [-.9,.9])for(const dz of [-.35,.35])cyl(x+dx,.3,z+dz,.08,.6,M.wood);
+}
+table(-16,-15);table(16,6);table(-6,16);
+box(-17.6,.8,-15,.8,1.6,.5,M.wood);box(14.4,.8,6,.8,1.6,.5,M.wood);
+
+/* locked doors */
+const doors=[];
+function door(x,z,id){
+ const d=box(x,1.35,z,1.05,2.7,.14,M.wood);doors.push({mesh:d,id,locked:true});
+}
+door(-16,-17.58,"cottage");door(16,3.42,"parson");door(-6,13.42,"witness");
+
+/* keys */
+const keysWorld=[
+ {x:-13.2,z:-13.5,id:"cottage",name:"Cottage Key"},
+ {x:12.5,z:8.4,id:"parson",name:"Parson's Key"},
+ {x:-2.8,z:18.2,id:"witness",name:"Witness House Key"}
+];
+const keyObjs=[];
+keysWorld.forEach(k=>{
+ const g=new THREE.Group();
+ const ring=new THREE.Mesh(new THREE.TorusGeometry(.15,.035,7,14),M.metal);g.add(ring);
+ const shaft=box(0,0,0,.45,.06,.06,M.metal);shaft.rotation.z=Math.PI/2;g.add(shaft);
+ g.position.set(k.x,.55,k.z);scene.add(g);keyObjs.push({...k,obj:g,found:false});
+});
+
+/* testimonies */
+const journalData=[
+ {title:"TESTIMONY I — THE BEGINNING",text:"[AP LANG CONTENT WILL BE ADDED LATER.]<br><br>This is a placeholder for the first historical source. The final version can contain your group's evidence, rhetorical analysis, and lens."},
+ {title:"TESTIMONY II — THE EXAMINATION",text:"[AP LANG CONTENT WILL BE ADDED LATER.]<br><br>This is a placeholder for the second historical source."},
+ {title:"TESTIMONY III — TITUBA",text:"[AP LANG CONTENT WILL BE ADDED LATER.]<br><br>This is a placeholder for the third historical source."},
+ {title:"TESTIMONY IV — FEAR SPREADS",text:"[AP LANG CONTENT WILL BE ADDED LATER.]<br><br>This is a placeholder for the fourth historical source."},
+ {title:"TESTIMONY V — DOUBT",text:"[AP LANG CONTENT WILL BE ADDED LATER.]<br><br>This is a placeholder for the fifth historical source."}
+];
+const testimonyPositions=[
+ {x:-16,z:-15,key:null},
+ {x:16,z:6,key:"parson"},
+ {x:-6,z:16,key:"witness"},
+ {x:-25,z:-5,key:null},
+ {x:0,z:-12,key:null}
+];
+const journals=[];
+testimonyPositions.forEach((p,i)=>{
+ const g=new THREE.Group();
+ const book=new THREE.Mesh(new THREE.BoxGeometry(1.05,.18,.78),M.paper);book.position.y=.12;g.add(book);
+ const band=new THREE.Mesh(new THREE.BoxGeometry(.1,.21,.82),M.red);band.position.y=.13;g.add(band);
+ const glow=new THREE.PointLight(0xffbd64,.7,3.5);glow.position.y=.65;g.add(glow);
+ g.position.set(p.x,.02,p.z);scene.add(g);
+ journals.push({g,index:i,found:false,locked:p.key});
+});
+
+/* hiding places */
+const hidingSpots=[
+ {x:-13.2,z:-15.1,name:"behind the cottage curtain"},
+ {x:13.7,z:6.8,name:"inside the parson's wardrobe"},
+ {x:-8.1,z:16.7,name:"behind the witness house shelves"}
+];
+const hideObjs=[];
+hidingSpots.forEach((h,i)=>{
+ const o=box(h.x,1.2,h.z,.8,2.3,.6,M.wood);hideObjs.push({obj:o,inside:false,name:h.name});
+});
+
+/* witch */
+function createWitch(){
+ const g=new THREE.Group();
+ const robe=new THREE.Mesh(new THREE.ConeGeometry(.72,2.8,7),M.black);robe.position.y=1.4;g.add(robe);
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.43,9,9),new THREE.MeshStandardMaterial({color:0x161616}));head.position.y=3.05;g.add(head);
+ const em=new THREE.MeshBasicMaterial({color:0xece2d0});
+ [-.15,.15].forEach(x=>{const e=new THREE.Mesh(new THREE.SphereGeometry(.045,6,6),em);e.position.set(x,3.08,.39);g.add(e)});
+ const hat=new THREE.Mesh(new THREE.ConeGeometry(.75,1.25,7),M.black);hat.position.y=3.75;g.add(hat);
+ g.visible=false;scene.add(g);return g;
+}
+const witch=createWitch();
+
+/* state */
+let running=false,gameOver=false,paused=false,journalOpen=false;
+let timeLeft=420,found=0,stage=0,stamina=100,fear=0;
+let lanternOn=true,hidden=false;
+let witchState="hidden",witchMemory=0,witchSearch=0;
+let eventTimer=12,thunderTimer=10,ambientTimer=2;
+let inventory=new Set();
+const keys={};
+
+const objectives=[
+"Enter Salem and find the first testimony.",
+"Find the key and enter the parson's house.",
+"Find the witness-house key and recover the third testimony.",
+"Search the gallows for the fourth testimony.",
+"Return to the meeting house for the final testimony.",
+"All testimonies recovered. Survive until the reveal."
+];
+function setObjective(){$("objective").textContent=objectives[Math.min(stage,5)];}
+function message(t,ms=1700){$("message").textContent=t;$("message").style.opacity=1;clearTimeout(message.t);message.t=setTimeout(()=>$("message").style.opacity=0,ms)}
+function scare(symbol="☠",ms=260){$("scareFace").textContent=symbol;$("scareOverlay").style.display="flex";setTimeout(()=>$("scareOverlay").style.display="none",ms)}
+function unlockDoor(id){
+ const d=doors.find(x=>x.id===id);if(!d)return;
+ d.locked=false;d.mesh.rotation.y=Math.PI/2;d.mesh.position.x+=.55;
+ message("Unlocked: "+id,1000);
+}
+function nearKey(){
+ for(const k of keyObjs)if(!k.found&&camera.position.distanceTo(k.obj.position)<1.5)return k;
+ return null;
+}
+function nearJournal(){
+ for(const j of journals){
+  if(j.found||j.locked&&!inventory.has(j.locked))continue;
+  if(camera.position.distanceTo(j.g.position)<2.0)return j;
+ }
+ return null;
+}
+function nearDoor(){
+ for(const d of doors)if(d.locked&&camera.position.distanceTo(d.mesh.position)<2)return d;
+ return null;
+}
+function nearHide(){
+ for(const h of hideObjs)if(camera.position.distanceTo(h.obj.position)<1.7)return h;
+ return null;
+}
+
+function openJournal(j){
+ journalOpen=true;controls.unlock();
+ $("journalTitle").textContent=journalData[j.index].title;
+ $("journalText").innerHTML=journalData[j.index].text;
+ $("journalOverlay").style.display="flex";
+ if(!j.found){
+  j.found=true;found++;$("count").textContent=`TESTIMONIES: ${found} / 5`;stage=found;setObjective();
+  if(found===1){message("A key is nearby. But so is something else.",1800);witchMemory=15;}
+  if(found===2){message("The witch has learned where you are.",1800);witchMemory=25;}
+  if(found===3){message("The town is no longer safe.",1800);witchMemory=35;}
+  if(found===4){message("Only one testimony remains.",1800);witchMemory=45;}
+  if(found===5)setTimeout(()=>{$("revealOverlay").style.display="flex"},1200);
+ }
+}
+function closeJournal(){journalOpen=false;$("journalOverlay").style.display="none";if(running)controls.lock()}
+
+function interact(){
+ if(!running||journalOpen)return;
+ const k=nearKey();
+ if(k){k.found=true;inventory.add(k.id);k.obj.visible=false;message("Found: "+k.name);unlockDoor(k.id);return}
+ const d=nearDoor();
+ if(d){if(inventory.has(d.id))unlockDoor(d.id);else message("Locked. Find the key.");return}
+ const j=nearJournal();
+ if(j){openJournal(j);return}
+ const h=nearHide();
+ if(h){hidden=!hidden;message(hidden?"You hide in the darkness.":"You step back into the street.");return}
+}
+
+function updatePrompt(){
+ if(hidden){$("prompt").textContent="H — LEAVE HIDING";$("prompt").style.opacity=1;return}
+ const k=nearKey();if(k){$("prompt").textContent="E — TAKE "+k.name.toUpperCase();$("prompt").style.opacity=1;return}
+ const d=nearDoor();if(d){$("prompt").textContent=inventory.has(d.id)?"E — OPEN DOOR":"E — LOCKED DOOR";$("prompt").style.opacity=1;return}
+ const j=nearJournal();if(j){$("prompt").textContent="E — READ TESTIMONY";$("prompt").style.opacity=1;return}
+ const h=nearHide();if(h){$("prompt").textContent="H — HIDE";$("prompt").style.opacity=1;return}
+ $("prompt").style.opacity=0;
+}
+
+function blocked(x,z){
+ if(hidden)return true;
+ if(Math.abs(x)>29||Math.abs(z)>29)return true;
+ const solids=[
+ [-16,-15,5,5],[-7,-16,5,5],[3,-16,5,5],[15,-15,5,5],
+ [-16,-5,5,5],[16,-5,5,5],[-16,6,5,5],[16,6,5,5],
+ [-15,16,5,5],[-6,16,5,5],[5,16,5,5],[15,15,5,5],
+ [0,-5,8,7]
+ ];
+ for(const s of solids){
+  if(Math.abs(x-s[0])<s[2]/2+.45&&Math.abs(z-s[1])<s[3]/2+.45){
+   /* permit the three door openings */
+   const opening=(Math.abs(x-s[0])<.8&&Math.abs(z-(s[1]-s[3]/2))<.9);
+   if(!opening)return true;
+  }
+ }
+ return false;
+}
+
+function move(dt){
+ if(!running||journalOpen||paused||hidden)return;
+ let ix=0,iz=0;if(keys.KeyW)iz--;if(keys.KeyS)iz++;if(keys.KeyA)ix--;if(keys.KeyD)ix++;
+ if(!ix&&!iz){stamina=Math.min(100,stamina+20*dt);$("staminaFill").style.width=stamina+"%";return}
+ let speed=4.4;
+ if(keys.ShiftLeft||keys.ShiftRight){
+  if(stamina>1){speed=7.2;stamina-=28*dt}else speed=4.4;
+ }else stamina=Math.min(100,stamina+15*dt);
+ $("staminaFill").style.width=Math.max(0,stamina)+"%";
+ const f=new THREE.Vector3();camera.getWorldDirection(f);f.y=0;f.normalize();
+ const r=new THREE.Vector3().crossVectors(f,new THREE.Vector3(0,1,0)).normalize();
+ const d=new THREE.Vector3().addScaledVector(f,-iz*speed*dt).addScaledVector(r,ix*speed*dt);
+ const nx=camera.position.x+d.x,nz=camera.position.z+d.z;
+ if(!blocked(nx,camera.position.z))camera.position.x=nx;
+ if(!blocked(camera.position.x,nz))camera.position.z=nz;
+ camera.position.y=1.65;
+}
+
+/* Witch AI:
+   - remembers the player's last known position for a while
+   - hears sprinting
+   - investigates last known position
+   - searches hiding places
+   - chases when close
+*/
+function spawnNearPlayer(radius=11){
+ const a=Math.random()*Math.PI*2;
+ witch.position.set(camera.position.x+Math.cos(a)*radius,0,camera.position.z+Math.sin(a)*radius);
+ witch.visible=true;witch.lookAt(camera.position.x,1.5,camera.position.z);
+}
+function witchUpdate(dt){
+ if(stage<1||gameOver)return;
+ witchMemory=Math.max(0,witchMemory-dt);
+ if(witchState==="hidden"){
+  if(witchMemory<=0){
+   if(Math.random()<dt*.025){
+    witchState="investigate";witchSearch=8;spawnNearPlayer(13);message("A figure moves between the houses.",1500);
+   }
+  }
+  return;
+ }
+ const d=witch.position.distanceTo(camera.position);
+ const sees=!hidden && d<13;
+ const hears=!hidden && (keys.ShiftLeft||keys.ShiftRight);
+ if(sees||hears){witchMemory=Math.max(witchMemory,9);witchState="chase";}
+ if(witchState==="chase"){
+  if(hidden){
+   witchState="search";witchSearch=6;message("The footsteps stop outside.",1200);
+  }else{
+   const dir=new THREE.Vector3().subVectors(camera.position,witch.position);dir.y=0;dir.normalize();
+   const speed=d<6?2.8:2.0;
+   witch.position.addScaledVector(dir,dt*speed);
+   witch.lookAt(camera.position.x,1.5,camera.position.z);
+   fear=Math.min(100,fear+dt*(d<8?12:4));
+   if(d<1.55)lose("The witch found you in the darkness.");
+  }
+ }else if(witchState==="investigate"){
+  const dir=new THREE.Vector3().subVectors(camera.position,witch.position);dir.y=0;dir.normalize();
+  witch.position.addScaledVector(dir,dt*1.25);witch.lookAt(camera.position.x,1.5,camera.position.z);
+  if(d<4){witchState="search";witchSearch=5}
+ }else if(witchState==="search"){
+  witchSearch-=dt;witch.rotation.y+=dt*.7;
+  fear=Math.min(100,fear+dt*2);
+  if(!hidden&&d<3){witchState="chase";witchMemory=7}
+  if(witchSearch<=0){witch.visible=false;witchState="hidden";witchMemory=5+Math.random()*8}
+ }
+ if(d>25&&witchState!=="chase"){witch.visible=false;witchState="hidden";witchMemory=8}
+ $("status").textContent=hidden?"HIDDEN":witch.visible?(fear>65?"DANGER":"UNSAFE"):"SAFE";
+}
+
+function lightning(){
+ /* flash scene lighting */
+ const old=moon.intensity;moon.intensity=1.7;
+ const flash=new THREE.PointLight(0xb9d4ff,5,80);flash.position.set(0,15,0);scene.add(flash);
+ setTimeout(()=>{moon.intensity=old;flash.intensity=.4},70);
+ setTimeout(()=>{scene.remove(flash)},240);
+ if(Math.random()<.5)message("Thunder rolls across the village.",900);
+}
+function atmosphere(dt){
+ thunderTimer-=dt;
+ if(thunderTimer<=0){thunderTimer=18+Math.random()*25;if(Math.random()<.8)lightning()}
+ ambientTimer-=dt;
+ if(ambientTimer<=0){
+  ambientTimer=4+Math.random()*7;
+  if(stage>0&&!hidden&&Math.random()<.45)message(Math.random()<.5?"...footsteps...":"...a door creaks...",850);
+ }
+ if(lanternOn)lantern.intensity=2.6+Math.sin(performance.now()*.011)*.13+Math.random()*.08;
+ fear=Math.max(0,fear-dt*1.5);
+}
+
+function scriptedEvents(dt){
+ eventTimer-=dt;
+ if(eventTimer<=0){
+  eventTimer=24+Math.random()*18;
+  if(stage>=1&&!hidden){
+   const r=Math.random();
+   if(r<.34){scare("◉  ◉",180);message("You are being watched.",1000)}
+   else if(r<.67){lightning();message("For a moment, the whole village is visible.",1000)}
+   else {message("A distant scream echoes through Salem.",1200)}
+  }
+ }
+}
+
+function updateTime(dt){
+ timeLeft-=dt;
+ if(timeLeft<=0){timeLeft=0;lose("Dawn came before you recovered the testimonies.");return}
+ $("timer").textContent=`${Math.floor(timeLeft/60).toString().padStart(2,"0")}:${Math.floor(timeLeft%60).toString().padStart(2,"0")}`;
+}
+function lose(text){if(gameOver)return;gameOver=true;running=false;controls.unlock();$("endTitle").textContent="THE NIGHT WON";$("endText").textContent=text;$("endOverlay").style.display="flex"}
+
+$("startBtn").onclick=()=>{$("startOverlay").style.display="none";running=true;controls.lock();setObjective()};
+$("closeJournal").onclick=closeJournal;
+$("resume").onclick=()=>{paused=false;$("pauseOverlay").style.display="none";controls.lock()};
+$("restart").onclick=()=>location.reload();
+$("continueReveal").onclick=()=>{$("revealOverlay").style.display="none";if(found>=5){gameOver=true;running=false;$("endTitle").textContent="THE TESTIMONIES SURVIVED";$("endText").textContent="You recovered every testimony. Your AP Lang material can now be inserted into the five journal entries and the final reveal."; $("endOverlay").style.display="flex"}};
+
+addEventListener("keydown",e=>{
+ keys[e.code]=true;
+ if(e.code==="KeyE")interact();
+ if(e.code==="KeyH"&&running&&!journalOpen){const h=nearHide();if(hidden||h){hidden=!hidden;message(hidden?"You hold your breath and hide.":"You leave hiding.",900)}}
+ if(e.code==="KeyF"&&running&&!journalOpen){lanternOn=!lanternOn;lantern.intensity=lanternOn?2.7:.08;message(lanternOn?"Lantern lit.":"Lantern extinguished.",650)}
+ if(e.code==="Escape"&&running&&!journalOpen&&!gameOver){paused=true;$("pauseOverlay").style.display="flex";controls.unlock()}
+});
+addEventListener("keyup",e=>keys[e.code]=false);
+
+let last=performance.now();
+function animate(now){
+ requestAnimationFrame(animate);const dt=Math.min((now-last)/1000,.05);last=now;
+ if(running&&!gameOver&&!paused){move(dt);updateTime(dt);witchUpdate(dt);atmosphere(dt);scriptedEvents(dt);updatePrompt()}
+ renderer.render(scene,camera);
+}
+animate(performance.now());
+addEventListener("resize",()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>
